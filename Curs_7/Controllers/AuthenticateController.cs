@@ -53,29 +53,53 @@ namespace Curs_7.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] RegisterDto registerDto)
+        public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            var user = await _userManager.FindByEmailAsync(registerDto.Email);
+            var user = await _userManager.FindByEmailAsync(loginDto.Email);
             if (user == null)
                 return NotFound();
 
             else
             {
-                var result = await _signInManager.CheckPasswordSignInAsync(user, registerDto.Password, false);
+                var result = await _signInManager.CheckPasswordSignInAsync(user, loginDto.Password, false);
 
                 if (result.Succeeded)
                 {
                     var token = await _tokenHelper.CreateAccessToken(user);
+                    var refreshToken = _tokenHelper.CreateRefreshToken();
+
+                    user.RefreshToken = refreshToken;
+                    await _userManager.UpdateAsync(user);
 
                     return Ok(new
                     {
-                        AccessToken = token
-                    }) ;
+                        AccessToken = token,
+                        RefreshToken = refreshToken
+                    });
                 }
 
                 else
                     return BadRequest("Failed to login, try again");
             }
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh(RefreshDto refreshDto)
+        {
+            var principal = _tokenHelper.GetPrincipalFromExpiredToken(refreshDto.AccessToken);
+            var username = principal.Identity.Name;
+
+            var user = await _userManager.FindByEmailAsync(username);
+
+            if (user.RefreshToken != refreshDto.RefreshToken)
+                return BadRequest("Bad refreshToken");
+
+            var newJwtToken = await _tokenHelper.CreateAccessToken(user);
+
+            return Ok(new
+            {
+                Token = newJwtToken
+            });
         }
     }
 }

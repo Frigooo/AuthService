@@ -8,6 +8,7 @@ namespace Curs_7.Models
 {
     public class User : IdentityUser<Guid>
     {
+        public string RefreshToken { get; set; }
         public ICollection<UserRole> UserRoles { get; set; }
     }
 }
